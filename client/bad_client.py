@@ -5,67 +5,79 @@ import time
 
 # Configuration
 SERVER_URL = "http://localhost:8000"
-CLIENT_ID = f"malicious-node-{uuid.uuid4().hex[:4]}"
-WEIGHT_SIZE = 500000 # Must match the Server's standardized size
+CLIENT_ID = f"test-node-{uuid.uuid4().hex[:4]}"
+WEIGHT_SIZE = 500000  # Must match server model size
+NOISE_SCALE = 0.001   # Small bounded noise
 
 def get_server_state():
-    """Fetch current model version from server."""
+    """Fetch current model from server."""
     try:
-        response = requests.get(f"{SERVER_URL}/get_model")
-        return response.json()
-    except Exception as e:
-        print(f"[{CLIENT_ID}] Error connecting to server: {e}")
+        response = requests.get(f"{SERVER_URL}/get_model", timeout=5)
+        response.raise_for_status()
+        data = response.json()
+
+        if "version" not in data:
+            print(f"[{CLIENT_ID}] Invalid response format:", data)
+            return None
+
+        return data
+
+    except requests.exceptions.RequestException as e:
+        print(f"[{CLIENT_ID}] Server connection error:", e)
         return None
 
-def submit_malicious_update(garbage_delta, current_version):
-    """Attempt to push garbage weights to the server."""
+
+def submit_update(delta, version):
+    """Submit safe update to server."""
     payload = {
         "client_id": CLIENT_ID,
-        "client_version": current_version,
-        "weights_delta": garbage_delta.tolist() # Sending raw random numbers
+        "client_version": version,
+        "weights_delta": delta.tolist()
     }
-    
-    print(f"[{CLIENT_ID}] Attempting to poison model v{current_version}...")
+
     try:
         start_time = time.time()
-        res = requests.post(f"{SERVER_URL}/submit_update", json=payload)
+        response = requests.post(
+            f"{SERVER_URL}/submit_update",
+            json=payload,
+            timeout=10
+        )
         duration = time.time() - start_time
-        
+        response.raise_for_status()
+
         print(f"[{CLIENT_ID}] Server responded in {duration:.2f}s")
-        return res.json()
-    except Exception as e:
-        print(f"[{CLIENT_ID}] Submission failed: {e}")
+        return response.json()
+
+    except requests.exceptions.RequestException as e:
+        print(f"[{CLIENT_ID}] Submission failed:", e)
         return None
 
-def run_attack():
-    print(f"--- Starting Malicious Client: {CLIENT_ID} ---")
-    
-    # 1. Get the current state
+
+def run_client():
+    print(f"--- Starting Client: {CLIENT_ID} ---")
+
     state = get_server_state()
     if not state:
+        print("Failed to fetch server state.")
         return
-    
-    current_v = state['version']
-    print(f"[{CLIENT_ID}] Targeting Global Model Version: {current_v}")
 
-    # 2. Generate "Poison" Weights
-    # Instead of training, we generate high-variance random noise
-    # to try and destroy the model's intelligence.
-    print(f"[{CLIENT_ID}] Generating malicious weight delta...")
-    garbage_delta = np.random.uniform(-1, 1, size=WEIGHT_SIZE)
+    version = state["version"]
+    print(f"[{CLIENT_ID}] Current Global Version: {version}")
 
-    # 3. Submit the attack
-    response = submit_malicious_update(garbage_delta, current_v)
+    print(f"[{CLIENT_ID}] Generating bounded test update...")
 
-    # 4. Analyze Server Reaction
+    # Simulate small gradient update (safe)
+    delta = np.random.normal(
+        loc=0,
+        scale=NOISE_SCALE,
+        size=WEIGHT_SIZE
+    )
+
+    response = submit_update(delta, version)
+
     if response:
-        if response.get("status") == "rejected":
-            print(f"[{CLIENT_ID}] ATTACK FAILED ❌")
-            print(f"[{CLIENT_ID}] Server Reason: {response.get('message')}")
-            print(f"[{CLIENT_ID}] Bounty Earned: 0 (Zero-Trust caught us!)")
-        else:
-            print(f"[{CLIENT_ID}] ATTACK SUCCESSFUL ✅ (This shouldn't happen if Zero-Trust is working!)")
-            print(f"[{CLIENT_ID}] Bounty Earned: {response.get('bounty_earned')}")
+        print(f"[{CLIENT_ID}] Server Response:", response)
+
 
 if __name__ == "__main__":
-    run_attack()
+    run_client()

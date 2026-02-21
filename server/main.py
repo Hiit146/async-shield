@@ -8,6 +8,7 @@ import numpy as np
 import json
 import uuid
 import os
+import torch
 
 from aggregator import RobustAggregator
 from database import AsyncDatabase
@@ -16,6 +17,7 @@ from models import RobustCNN, restore_1d_to_model
 
 app = FastAPI()
 
+# Enable CORS for Next.js Frontend (port 3000)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"], 
@@ -24,19 +26,18 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# 1. Components Initialization
+# Initialize Core Components
 db = AsyncDatabase("asyncshield.db")
 aggregator = RobustAggregator()
 evaluator = Evaluator() 
 
-# 2. Global Configuration
-MAX_WEIGHTS = 500000  # Size for RobustCNN
+# Global Configuration
+MAX_WEIGHTS = 500000  # Size for RobustCNN vector
 
-# IN-MEMORY STORE for Weights (repo_id -> numpy array)
+# In-Memory Storage for weights (repo_id -> numpy array)
 repo_weights_store = {}
 
-# --- HELPER FUNCTIONS ---
-
+# --- HELPER: INITIALIZE WEIGHTS ---
 def get_initial_weights(model, target_size=MAX_WEIGHTS):
     weights = []
     state_dict = model.state_dict()
@@ -48,34 +49,33 @@ def get_initial_weights(model, target_size=MAX_WEIGHTS):
         return np.concatenate([flat_1d, padding])
     return flat_1d[:target_size]
 
-# --- REPO MANAGEMENT ENDPOINTS ---
+# --- REPOSITORY MANAGEMENT ---
 
 @app.post("/create_repo")
 async def create_repo(name: str = Form(...), description: str = Form(...), owner: str = Form(...)):
-    """Server Owner creates a new Model Repository (GitHub 'New Repo' style)"""
+    """Orchestrator creates a new model project."""
     repo_id = str(uuid.uuid4())[:8]
     
-    # Initialize weights with random RobustCNN weights (Heartbeat Init)
+    # Initialize with random RobustCNN brain
     initial_weights = get_initial_weights(RobustCNN())
     repo_weights_store[repo_id] = initial_weights
     
-    # Save to SQLite
     db.create_repo(repo_id, name, description, owner)
-    
-    return {"status": "success", "repo_id": repo_id, "message": f"Repo '{name}' initialized."}
+    print(f"[ADMIN] New Repo Created: {name} ({repo_id})")
+    return {"status": "success", "repo_id": repo_id}
 
 @app.get("/repos")
 def list_repos():
-    """Returns all available model repositories for clients to see"""
+    """Returns all projects for the contributor dashboard."""
     return db.get_all_repos()
 
 @app.get("/repos/{repo_id}/get_model")
 def get_repo_model(repo_id: str):
-    """Downloads weights for a specific repository"""
+    """Clients download current weights to start local training."""
     if repo_id not in repo_weights_store:
-        raise HTTPException(status_code=404, detail="Repository not found")
+        # Recovery: If server restarted, re-init with random
+        repo_weights_store[repo_id] = get_initial_weights(RobustCNN())
     
-    # Find current version from DB
     repos = db.get_all_repos()
     repo_info = next((r for r in repos if r['id'] == repo_id), {"version": 1})
     
@@ -85,7 +85,7 @@ def get_repo_model(repo_id: str):
         "weights": repo_weights_store[repo_id].tolist()
     }
 
-# --- UNIFIED UPDATE ENDPOINT (Zero-Trust + Adaptive Trust) ---
+# --- THE UNIFIED SUBMIT ENDPOINT (JSON File Upload) ---
 
 @app.post("/repos/{repo_id}/submit_update")
 async def submit_repo_update(
@@ -94,86 +94,78 @@ async def submit_repo_update(
     client_version: int = Form(...), 
     file: UploadFile = File(...)
 ):
-    """
-    Handles JSON file upload. 
-    Applies Zero-Trust Evaluation, Adaptive Trust, and Staleness Penalty.
-    """
-    if repo_id not in repo_weights_store:
-        return {"status": "error", "message": "Repo not found."}
+    print(f"\n[RECEIVED] Commit attempt for Repo: {repo_id} from {client_id}")
 
-    # 1. Parse File
+    # 1. Memory Safety
+    if repo_id not in repo_weights_store:
+        repo_weights_store[repo_id] = get_initial_weights(RobustCNN())
+
+    # 2. Parse the JSON File
     try:
         contents = await file.read()
         data = json.loads(contents)
         delta = np.array(data["weights_delta"])
-    except Exception:
-        return {"status": "error", "message": "Invalid JSON format."}
+    except Exception as e:
+        print(f"[ERROR] JSON Parse Failed: {e}")
+        return {"status": "error", "message": "Invalid JSON format. Weights not found."}
 
+    # 3. ZERO-TRUST EVALUATION
     global_weights = repo_weights_store[repo_id]
-    
-    # 2. ZERO-TRUST: EVALUATION
-    # verify_update(old_weights, new_delta)
     real_delta_i, current_accuracy = evaluator.verify_update(global_weights, delta)
     
-    # DEBUG LOG
-    print(f"[REPO: {repo_id}] EVAL from {client_id}: ΔI: {real_delta_i*100:.4f}% | Acc: {current_accuracy*100:.2f}%")
+    print(f"[EVAL] ΔI: {real_delta_i*100:.4f}% | Target Acc: {current_accuracy*100:.2f}%")
 
-    # FRAUD DETECTION (Threshold check)
+    # FRAUD DETECTION: If accuracy drops by > 1.5%
     if real_delta_i < -0.015:
         db.add_commit(repo_id, client_id, "Rejected ❌", f"Fraud: Acc drop {abs(real_delta_i*100):.1f}%", "None", 0)
         return {"status": "rejected", "message": "Model poisoning detected by Zero-Trust."}
 
-    # IF accuracy didn't improve, we log it but don't merge (Protects Global Brain)
+    # QUALITY GATE: If accuracy didn't improve at all
     if real_delta_i <= 0:
-        db.add_commit(repo_id, client_id, "Rejected ❌", "No improvement on Golden Set", "None", 0)
-        return {"status": "rejected", "message": "Update did not improve model accuracy."}
+        db.add_commit(repo_id, client_id, "Rejected ❌", "No measurable improvement", "None", 0)
+        return {"status": "rejected", "message": "Update did not improve model."}
 
-    # 3. MATH: ADAPTIVE ASYNC TRUST
-    # Use repo version for staleness math
+    # 4. MATH: ADAPTIVE ASYNC AGGREGATION
     repos = db.get_all_repos()
     current_repo_v = next((r for r in repos if r['id'] == repo_id))['version']
     
+    # Staleness + Intelligence Boost
     base_alpha = aggregator.calculate_staleness(current_repo_v, client_version)
     intel_boost = max(0, real_delta_i * 2.0)
     adaptive_trust = min(1.0, base_alpha + intel_boost)
 
-    # 4. AGGREGATE & UPDATE
-    # Apply change: W_new = W_old + (LR * Trust) * Delta
+    # 5. MERGE TO GLOBAL BRAIN
     repo_weights_store[repo_id] = global_weights + (aggregator.lr * adaptive_trust) * delta
     
-    # Update Version in DB
+    # Update Version and Bounty
     new_version = current_repo_v + 1
     db.update_repo_version(repo_id, new_version)
-    
-    # Calculate Bounty
     bounty = 5 + int(real_delta_i * 10000)
 
-    # Log Commit in GitHub style
+    # Log GitHub-style Commit
     db.add_commit(
-        repo_id, 
-        client_id, 
-        "Merged ✅", 
-        f"Verified Improvement: {real_delta_i*100:.2f}% | Trust: {adaptive_trust:.2f}", 
-        f"v{current_repo_v}->v{new_version}", 
-        bounty
+        repo_id, client_id, "Merged ✅", 
+        f"Verified Improvement: {real_delta_i*100:.2f}%", 
+        f"v{current_repo_v}->v{new_version}", bounty
     )
 
-    return {
-        "status": "success", 
-        "bounty": bounty, 
-        "new_version": new_version,
-        "trust": f"{adaptive_trust:.2f}"
-    }
+    print(f"[SUCCESS] Repo {repo_id} updated. Bounty: {bounty}")
+    return {"status": "success", "bounty": bounty, "version": new_version}
 
-# --- DASHBOARD ENDPOINTS ---
+# --- DASHBOARD & UTILS ---
 
-@app.get("/repos/{repo_id}/dashboard")
-def get_repo_dashboard(repo_id: str):
-    """Returns commit history and current state for a specific repo"""
-    commits = db.get_repo_commits(repo_id)
+@app.get("/dashboard_data")
+def get_dashboard_data():
+    """Comprehensive data for Admin dashboard."""
+    repos = db.get_all_repos()
+    # For demo, we just return commits for the first repo or all
+    all_commits = []
+    for r in repos:
+        all_commits.extend(db.get_repo_commits(r['id']))
+    
     return {
-        "repo_id": repo_id,
-        "commits": commits
+        "repos": repos,
+        "commits": all_commits[:20] # Last 20 commits globally
     }
 
 @app.get("/download_architecture")
