@@ -1,3 +1,4 @@
+# server/database.py
 import sqlite3
 import time
 
@@ -8,9 +9,22 @@ class AsyncDatabase:
         self._create_tables()
 
     def _create_tables(self):
+        # NEW: Track GitHub-style Repositories
+        self.cursor.execute('''
+            CREATE TABLE IF NOT EXISTS repos (
+                id TEXT PRIMARY KEY,
+                name TEXT,
+                description TEXT,
+                owner TEXT,
+                version INTEGER,
+                created_at REAL
+            )
+        ''')
+        # UPDATED: Added repo_id
         self.cursor.execute('''
             CREATE TABLE IF NOT EXISTS commits (
                 id TEXT PRIMARY KEY,
+                repo_id TEXT,
                 client_id TEXT,
                 status TEXT,
                 reason TEXT,
@@ -19,40 +33,31 @@ class AsyncDatabase:
                 timestamp REAL
             )
         ''')
-        self.cursor.execute('''
-            CREATE TABLE IF NOT EXISTS bounties (
-                client_id TEXT PRIMARY KEY,
-                total_bounty INTEGER
-            )
-        ''')
         self.conn.commit()
 
-    def add_commit(self, client_id, status, reason, version_bump, bounty):
+    def create_repo(self, repo_id, name, description, owner):
+        self.cursor.execute('''
+            INSERT INTO repos (id, name, description, owner, version, created_at)
+            VALUES (?, ?, ?, ?, 1, ?)
+        ''', (repo_id, name, description, owner, time.time()))
+        self.conn.commit()
+
+    def update_repo_version(self, repo_id, new_version):
+        self.cursor.execute('UPDATE repos SET version = ? WHERE id = ?', (new_version, repo_id))
+        self.conn.commit()
+
+    def add_commit(self, repo_id, client_id, status, reason, version_bump, bounty):
         commit_id = f"commit-{int(time.time() * 1000)}"
         self.cursor.execute('''
-            INSERT INTO commits (id, client_id, status, reason, version_bump, bounty, timestamp)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
-        ''', (commit_id, client_id, status, reason, version_bump, bounty, time.time()))
-        
-        # Update Leaderboard if it was a successful merged commit
-        if bounty > 0:
-            self.cursor.execute('''
-                INSERT INTO bounties (client_id, total_bounty)
-                VALUES (?, ?)
-                ON CONFLICT(client_id) DO UPDATE SET total_bounty = total_bounty + ?
-            ''', (client_id, bounty, bounty))
-            
+            INSERT INTO commits (id, repo_id, client_id, status, reason, version_bump, bounty, timestamp)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        ''', (commit_id, repo_id, client_id, status, reason, version_bump, bounty, time.time()))
         self.conn.commit()
 
-    def get_dashboard_data(self):
-        """Fetches data formatted for the Next.js frontend."""
-        self.cursor.execute('SELECT client_id, total_bounty FROM bounties ORDER BY total_bounty DESC')
-        leaderboard = [{"client": row[0], "bounty": row[1]} for row in self.cursor.fetchall()]
+    def get_all_repos(self):
+        self.cursor.execute('SELECT id, name, description, owner, version FROM repos ORDER BY created_at DESC')
+        return [{"id": r[0], "name": r[1], "description": r[2], "owner": r[3], "version": r[4]} for r in self.cursor.fetchall()]
 
-        self.cursor.execute('SELECT client_id, status, reason, version_bump, bounty FROM commits ORDER BY timestamp DESC LIMIT 15')
-        commits = [{
-            "client": row[0], "status": row[1], "reason": row[2], 
-            "version_bump": row[3], "bounty": row[4]
-        } for row in self.cursor.fetchall()]
-
-        return {"leaderboard": leaderboard, "commits": commits}
+    def get_repo_commits(self, repo_id):
+        self.cursor.execute('SELECT client_id, status, reason, version_bump, bounty, timestamp FROM commits WHERE repo_id = ? ORDER BY timestamp DESC', (repo_id,))
+        return [{"client": r[0], "status": r[1], "reason": r[2], "version_bump": r[3], "bounty": r[4]} for r in self.cursor.fetchall()]
