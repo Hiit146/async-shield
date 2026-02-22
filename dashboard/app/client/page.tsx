@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-import { Search, UploadCloud, Coins, Loader2, CheckCircle, XCircle, LogOut, GitCommit } from "lucide-react";
+import { Search, UploadCloud, Coins, Loader2, CheckCircle, XCircle, LogOut, GitCommit, Download } from "lucide-react";
 import AuthWrapper, { User } from "@/components/AuthWrapper";
 import Link from "next/link";
 
@@ -84,9 +84,14 @@ function ClientDashboardContent({ user, logout, refreshUser }: { user: User, log
                 <span>v{repo.version}</span>
                 <span className="text-indigo-400">ID: {repo.id}</span>
               </div>
-              <Link href={`/repo/${repo.id}`} onClick={(e) => e.stopPropagation()} className="flex items-center gap-1 text-indigo-400 hover:text-indigo-300 bg-indigo-500/10 px-3 py-2 rounded-lg transition-colors">
-                <GitCommit size={14} /> History
-              </Link>
+              <div className="flex items-center gap-2">
+                <button onClick={(e) => { e.stopPropagation(); window.open(`http://localhost:8000/repos/${repo.id}/download_model`, '_blank'); }} className="flex items-center gap-1 text-emerald-400 hover:text-emerald-300 bg-emerald-500/10 px-3 py-2 rounded-lg transition-colors">
+                  <Download size={14} /> Model
+                </button>
+                <Link href={`/repo/${repo.id}`} onClick={(e) => e.stopPropagation()} className="flex items-center gap-1 text-indigo-400 hover:text-indigo-300 bg-indigo-500/10 px-3 py-2 rounded-lg transition-colors">
+                  <GitCommit size={14} /> History
+                </Link>
+              </div>
             </div>
           </div>
         ))}

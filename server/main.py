@@ -93,6 +93,28 @@ def get_repo_model(repo_id: str):
         "weights": repo_weights_store[repo_id].tolist()
     }
 
+@app.get("/repos/{repo_id}/download_model")
+def download_repo_model_file(repo_id: str):
+    """Download the global model as a .pth file."""
+    if repo_id not in repo_weights_store:
+        raise HTTPException(status_code=404, detail="Repo not found")
+    
+    temp_path = os.path.join("temp_models", f"global_model_{repo_id}.pth")
+    
+    # If a file was uploaded and saved, return that exact file
+    if os.path.exists(temp_path):
+        return FileResponse(temp_path, media_type="application/octet-stream", filename=f"global_model_{repo_id}.pth")
+        
+    # Otherwise, generate it from the current weights
+    weights_1d = repo_weights_store[repo_id]
+    model = RobustCNN()
+    model = restore_1d_to_model(model, weights_1d)
+    
+    os.makedirs("temp_models", exist_ok=True)
+    torch.save(model.state_dict(), temp_path)
+    
+    return FileResponse(temp_path, media_type="application/octet-stream", filename=f"global_model_{repo_id}.pth")
+
 # --- THE UNIFIED SUBMIT ENDPOINT (JSON File Upload) ---
 
 @app.post("/repos/{repo_id}/submit_update")
@@ -181,6 +203,12 @@ async def submit_repo_update(
     # Update DB and Versioning
     new_version = current_repo_v + 1
     db.update_repo_version(repo_id, new_version)
+    
+    # Save the uploaded file to disk so it can be downloaded later
+    os.makedirs("temp_models", exist_ok=True)
+    save_path = os.path.join("temp_models", f"global_model_{repo_id}.pth")
+    with open(save_path, "wb") as f:
+        f.write(contents)
     
     bounty = 5 + int(real_delta_i * 10000)
     db.add_user_tokens(client_id, bounty)

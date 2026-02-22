@@ -36,6 +36,10 @@ export default function LandingPage() {
         label: '🛡️ Login as Client',
         onClick: () => router.push('/client'),
       },
+      tertiary: {
+        label: '☁️ Cloud Compute',
+        onClick: () => router.push('/compute'),
+      },
     },
     projects: [
       { 

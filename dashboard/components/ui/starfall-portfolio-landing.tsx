@@ -12,7 +12,7 @@ export interface PortfolioPageProps {
   navLinks?: NavLink[];
   resume?: { label: string; onClick?: () => void; };
   hero?: { titleLine1: React.ReactNode; titleLine2Gradient: React.ReactNode; subtitle: React.ReactNode; };
-  ctaButtons?: { primary: { label: string; onClick?: () => void; }; secondary: { label: string; onClick?: () => void; }; };
+  ctaButtons?: { primary: { label: string; onClick?: () => void; }; secondary: { label: string; onClick?: () => void; }; tertiary?: { label: string; onClick?: () => void; }; };
   projects?: Project[];
   stats?: Stat[];
   showAnimatedBackground?: boolean;
@@ -68,7 +68,7 @@ const defaultData = {
   navLinks: [ { label: 'About', href: '#about' }, { label: 'Projects', href: '#projects' }, { label: 'Skills', href: '#skills' } ] as NavLink[],
   resume: { label: 'Resume', onClick: undefined as (() => void) | undefined },
   hero: { titleLine1: 'Creative Developer &', titleLine2Gradient: 'Digital Designer', subtitle: 'I craft beautiful digital experiences through code and design. Specializing in modern web development, UI/UX design, and bringing innovative ideas to life.', },
-  ctaButtons: { primary: { label: 'View My Work', onClick: undefined as (() => void) | undefined }, secondary: { label: 'Get In Touch', onClick: undefined as (() => void) | undefined }, },
+  ctaButtons: { primary: { label: 'View My Work', onClick: undefined as (() => void) | undefined }, secondary: { label: 'Get In Touch', onClick: undefined as (() => void) | undefined }, tertiary: { label: 'Cloud Compute', onClick: undefined as (() => void) | undefined } },
   projects: [ { title: 'FinTech Mobile App', description: 'React Native app with AI-powered financial insights.', tags: ['React Native', 'Node.js'] }, { title: 'Data Visualization Platform', description: 'Interactive dashboard for complex data analysis.', tags: ['D3.js', 'Python'] }, { title: '3D Portfolio Site', description: 'Immersive WebGL experience with 3D elements.', tags: ['Three.js', 'WebGL'] }, ] as Project[],
   stats: [ { value: '50+', label: 'Projects Completed' }, { value: '5+', label: 'Years Experience' }, { value: '15+', label: 'Happy Clients' }, ] as Stat[],
 };
@@ -88,23 +88,6 @@ const PortfolioPage: React.FC<PortfolioPageProps> = ({
     <div className="bg-background text-foreground geist-font">
       {showAnimatedBackground && <AuroraBackground />}
       <div className="relative z-10">
-        <nav className="w-full px-6 py-4">
-            <div className="max-w-7xl mx-auto flex justify-between items-center">
-                <div className="flex items-center space-x-2">
-                    <div className="w-8 h-8 rounded-lg bg-border backdrop-blur-md border border-border flex items-center justify-center">
-                        <span className="geist-font text-sm font-bold text-foreground">{logo.initials}</span>
-                    </div>
-                    <span className="geist-font text-lg font-medium text-foreground">{logo.name}</span>
-                </div>
-                <div className="hidden md:flex items-center space-x-8">
-                    {navLinks.map(link => (
-                        <a key={link.label} href={link.href} className="text-muted-foreground hover:text-foreground transition-colors inter-font text-sm">{link.label}</a>
-                    ))}
-                </div>
-                <button onClick={resume.onClick} className="glass-button px-4 py-2 rounded-lg text-foreground text-sm font-medium inter-font">{resume.label}</button>
-            </div>
-        </nav>
-        <div className="divider" />
         <main id="about" className="w-full min-h-screen flex flex-col items-center justify-center px-6 py-20">
             <div className="max-w-6xl mx-auto text-center">
                 <div className="mb-8 float-animation">
@@ -117,6 +100,9 @@ const PortfolioPage: React.FC<PortfolioPageProps> = ({
                 <div className="flex flex-col sm:flex-row gap-4 justify-center items-center mb-16">
                     <button onClick={ctaButtons.primary.onClick} className="primary-button px-6 py-3 text-foreground rounded-lg font-medium text-sm min-w-[160px]">{ctaButtons.primary.label}</button>
                     <button onClick={ctaButtons.secondary.onClick} className="glass-button min-w-[160px] inter-font text-sm font-medium text-foreground rounded-lg px-6 py-3">{ctaButtons.secondary.label}</button>
+                    {ctaButtons.tertiary && (
+                        <button onClick={ctaButtons.tertiary.onClick} className="glass-button min-w-[160px] inter-font text-sm font-medium text-foreground rounded-lg px-6 py-3">{ctaButtons.tertiary.label}</button>
+                    )}
                 </div>
                 <div className="divider mb-16" />
                 <div id="projects" className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 max-w-6xl mx-auto mb-16">

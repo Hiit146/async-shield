@@ -92,7 +92,7 @@ function ServerDashboardContent({ user, logout, refreshUser }: { user: User, log
             </div>
             {/* Mock Golden Dataset Upload for UI */}
             <div>
-              <label className="text-sm text-gray-400">Attach Golden Dataset (.zip)</label>
+              <label className="text-sm text-gray-400">Upload Model</label>
               <input type="file" className="w-full text-sm text-gray-400 mt-1 file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:bg-white/10 file:text-white hover:file:bg-white/20"/>
             </div>
             <button type="submit" className="w-full bg-rose-600 hover:bg-rose-500 py-2 rounded font-bold transition-colors">
