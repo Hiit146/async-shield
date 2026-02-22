@@ -9,6 +9,14 @@ class AsyncDatabase:
         self._create_tables()
 
     def _create_tables(self):
+        # NEW: Track Users
+        self.cursor.execute('''
+            CREATE TABLE IF NOT EXISTS users (
+                username TEXT PRIMARY KEY,
+                password TEXT,
+                tokens INTEGER DEFAULT 0
+            )
+        ''')
         # NEW: Track GitHub-style Repositories
         self.cursor.execute('''
             CREATE TABLE IF NOT EXISTS repos (
@@ -61,3 +69,23 @@ class AsyncDatabase:
     def get_repo_commits(self, repo_id):
         self.cursor.execute('SELECT client_id, status, reason, version_bump, bounty, timestamp FROM commits WHERE repo_id = ? ORDER BY timestamp DESC', (repo_id,))
         return [{"client": r[0], "status": r[1], "reason": r[2], "version_bump": r[3], "bounty": r[4]} for r in self.cursor.fetchall()]
+    def create_user(self, username, password):
+        try:
+            self.cursor.execute('INSERT INTO users (username, password, tokens) VALUES (?, ?, 0)', (username, password))
+            self.conn.commit()
+            return True
+        except sqlite3.IntegrityError:
+            return False
+
+    def verify_user(self, username, password):
+        self.cursor.execute('SELECT * FROM users WHERE username = ? AND password = ?', (username, password))
+        return self.cursor.fetchone() is not None
+
+    def get_user_tokens(self, username):
+        self.cursor.execute('SELECT tokens FROM users WHERE username = ?', (username,))
+        result = self.cursor.fetchone()
+        return result[0] if result else 0
+
+    def add_user_tokens(self, username, amount):
+        self.cursor.execute('UPDATE users SET tokens = tokens + ? WHERE username = ?', (amount, username))
+        self.conn.commit()

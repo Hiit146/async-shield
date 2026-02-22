@@ -158,6 +158,7 @@ async def submit_repo_update(
     db.update_repo_version(repo_id, new_version)
     
     bounty = 5 + int(real_delta_i * 10000)
+    db.add_user_tokens(client_id, bounty)
     db.add_commit(repo_id, client_id, "Merged ✅", f"Imp: {real_delta_i*100:.2f}% | Trust: {adaptive_trust:.2f}", f"v{current_repo_v}->v{new_version}", bounty)
 
     print(f"[SUCCESS] Repo {repo_id} upgraded to v{new_version}")
@@ -324,3 +325,24 @@ async def download_compute_result(run_id: str):
     if os.path.exists(output_pth):
         return FileResponse(output_pth, media_type="application/octet-stream", filename=f"model_{run_id[:8]}.pth")
     raise HTTPException(status_code=404, detail="Model file not found.")
+
+# --- USER AUTHENTICATION ---
+
+@app.post("/auth/register")
+async def register_user(username: str = Form(...), password: str = Form(...)):
+    success = db.create_user(username, password)
+    if success:
+        return {"status": "success", "message": "User registered successfully."}
+    return {"status": "error", "message": "Username already exists."}
+
+@app.post("/auth/login")
+async def login_user(username: str = Form(...), password: str = Form(...)):
+    if db.verify_user(username, password):
+        tokens = db.get_user_tokens(username)
+        return {"status": "success", "username": username, "tokens": tokens}
+    return {"status": "error", "message": "Invalid username or password."}
+
+@app.get("/auth/user/{username}")
+async def get_user_info(username: str):
+    tokens = db.get_user_tokens(username)
+    return {"username": username, "tokens": tokens}
