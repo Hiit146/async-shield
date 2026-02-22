@@ -98,46 +98,53 @@ function RepoHistoryContent({ user }: { user: User }) {
             <p className="text-gray-400">No commits yet. Be the first to contribute!</p>
           </div>
         ) : (
-          <div className="space-y-4">
+          <div className="space-y-4 relative before:absolute before:inset-0 before:ml-5 before:-translate-x-px md:before:mx-auto md:before:translate-x-0 before:h-full before:w-0.5 before:bg-gradient-to-b before:from-transparent before:via-white/10 before:to-transparent">
             {commits.map((commit, idx) => (
-              <div key={idx} className="bg-white/[0.02] border border-white/10 p-5 rounded-xl flex flex-col md:flex-row md:items-center justify-between gap-4 hover:bg-white/[0.04] transition-colors">
-                <div className="flex items-start gap-4">
-                  <div className="mt-1">
-                    {commit.status.includes("Merged") ? (
-                      <CheckCircle className="text-green-500" size={20} />
-                    ) : (
-                      <XCircle className="text-red-500" size={20} />
-                    )}
-                  </div>
-                  <div>
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="font-bold text-white">{commit.client}</span>
-                      <span className="text-xs text-gray-500">submitted an update</span>
+              <div key={idx} className="relative flex items-center justify-between md:justify-normal md:odd:flex-row-reverse group is-active">
+                {/* Timeline dot */}
+                <div className="flex items-center justify-center w-10 h-10 rounded-full border-4 border-[#020202] bg-white/[0.02] group-hover:bg-white/[0.05] text-white shadow shrink-0 md:order-1 md:group-odd:-translate-x-1/2 md:group-even:translate-x-1/2 z-10 transition-colors">
+                  {commit.status.includes("Merged") ? (
+                    <CheckCircle className="text-green-500" size={16} />
+                  ) : (
+                    <XCircle className="text-red-500" size={16} />
+                  )}
+                </div>
+                
+                {/* Card */}
+                <div className="w-[calc(100%-4rem)] md:w-[calc(50%-2.5rem)] bg-white/[0.02] border border-white/10 p-5 rounded-xl hover:bg-white/[0.04] transition-colors">
+                  <div className="flex flex-col gap-3">
+                    <div className="flex items-start justify-between gap-4">
+                      <div>
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="font-bold text-white">{commit.client}</span>
+                          <span className="text-xs text-gray-500">submitted an update</span>
+                        </div>
+                        <p className="text-sm text-gray-400">{commit.reason}</p>
+                      </div>
+                      <div className={`text-xs font-bold px-2 py-1 rounded-full border whitespace-nowrap ${commit.status.includes("Merged") ? 'bg-green-500/10 text-green-400 border-green-500/20' : 'bg-red-500/10 text-red-400 border-red-500/20'}`}>
+                        {commit.status}
+                      </div>
                     </div>
-                    <p className="text-sm text-gray-400">{commit.reason}</p>
-                    <div className="flex items-center gap-4 mt-2 text-xs text-gray-500">
-                      <span className="flex items-center gap-1">
-                        <Clock size={12} />
-                        {new Date(commit.timestamp * 1000).toLocaleString()}
-                      </span>
-                      {commit.version_bump !== "None" && (
-                        <span className="bg-blue-500/10 text-blue-400 px-2 py-0.5 rounded border border-blue-500/20">
-                          {commit.version_bump}
+                    
+                    <div className="flex items-center justify-between mt-2 pt-3 border-t border-white/5">
+                      <div className="flex items-center gap-3 text-xs text-gray-500">
+                        <span className="flex items-center gap-1">
+                          <Clock size={12} />
+                          {new Date(commit.timestamp * 1000).toLocaleString()}
                         </span>
+                        {commit.version_bump !== "None" && (
+                          <span className="bg-blue-500/10 text-blue-400 px-2 py-0.5 rounded border border-blue-500/20 font-mono">
+                            {commit.version_bump}
+                          </span>
+                        )}
+                      </div>
+                      {commit.bounty > 0 && (
+                        <div className="flex items-center gap-1 text-yellow-500 text-xs font-bold">
+                          <Coins size={12} /> +{commit.bounty}
+                        </div>
                       )}
                     </div>
                   </div>
-                </div>
-                
-                <div className="flex items-center gap-4 md:flex-col md:items-end md:gap-2">
-                  <div className={`text-sm font-bold px-3 py-1 rounded-full border ${commit.status.includes("Merged") ? 'bg-green-500/10 text-green-400 border-green-500/20' : 'bg-red-500/10 text-red-400 border-red-500/20'}`}>
-                    {commit.status}
-                  </div>
-                  {commit.bounty > 0 && (
-                    <div className="flex items-center gap-1 text-yellow-500 text-xs font-bold">
-                      <Coins size={12} /> +{commit.bounty}
-                    </div>
-                  )}
                 </div>
               </div>
             ))}
