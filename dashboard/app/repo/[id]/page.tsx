@@ -33,9 +33,10 @@ function RepoHistoryContent({ user }: { user: User }) {
         // Fetch commits
         const commitsRes = await fetch(`http://localhost:8000/repos/${repoId}/commits`);
         const commitsData = await commitsRes.json();
-        setCommits(commitsData);
+        setCommits(Array.isArray(commitsData) ? commitsData : []);
       } catch (err) {
         console.error("Failed to fetch repo data", err);
+        setCommits([]);
       } finally {
         setLoading(false);
       }
