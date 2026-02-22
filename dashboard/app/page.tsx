@@ -16,6 +16,7 @@ export default function LandingPage() {
       { label: 'About', href: '#about' },
       { label: 'Features', href: '#projects' },
       { label: 'Stats', href: '#skills' },
+      { label: 'Cloud Compute', href: '/compute' },
     ],
     resume: {
       label: 'GitHub Repo',
