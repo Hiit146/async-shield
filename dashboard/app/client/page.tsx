@@ -1,7 +1,8 @@
 "use client";
 import { useEffect, useState } from "react";
-import { Search, UploadCloud, Coins, Loader2, CheckCircle, XCircle, LogOut } from "lucide-react";
+import { Search, UploadCloud, Coins, Loader2, CheckCircle, XCircle, LogOut, GitCommit } from "lucide-react";
 import AuthWrapper, { User } from "@/components/AuthWrapper";
+import Link from "next/link";
 
 export default function ClientDashboard() {
   return (
@@ -72,13 +73,20 @@ function ClientDashboardContent({ user, logout, refreshUser }: { user: User, log
         {repos.map(repo => (
           <div 
             key={repo.id} onClick={() => setSelectedRepo(repo.id)}
-            className={`p-6 rounded-2xl border transition-all cursor-pointer ${selectedRepo === repo.id ? 'bg-indigo-600/20 border-indigo-500 ring-1 ring-indigo-500' : 'bg-white/5 border-white/10 hover:border-white/20'}`}
+            className={`p-6 rounded-2xl border transition-all cursor-pointer flex flex-col justify-between ${selectedRepo === repo.id ? 'bg-indigo-600/20 border-indigo-500 ring-1 ring-indigo-500' : 'bg-white/5 border-white/10 hover:border-white/20'}`}
           >
-            <h3 className="font-bold text-white mb-1">{repo.name}</h3>
-            <p className="text-xs text-gray-500 mb-4 h-8 overflow-hidden">{repo.description}</p>
-            <div className="flex justify-between text-[10px] uppercase font-bold tracking-widest text-gray-400">
-              <span>v{repo.version}</span>
-              <span className="text-indigo-400">ID: {repo.id}</span>
+            <div>
+              <h3 className="font-bold text-white mb-1">{repo.name}</h3>
+              <p className="text-xs text-gray-500 mb-4 h-8 overflow-hidden">{repo.description}</p>
+            </div>
+            <div className="flex justify-between items-center text-[10px] uppercase font-bold tracking-widest text-gray-400 mt-4 pt-4 border-t border-white/10">
+              <div className="flex flex-col gap-1">
+                <span>v{repo.version}</span>
+                <span className="text-indigo-400">ID: {repo.id}</span>
+              </div>
+              <Link href={`/repo/${repo.id}`} onClick={(e) => e.stopPropagation()} className="flex items-center gap-1 text-indigo-400 hover:text-indigo-300 bg-indigo-500/10 px-3 py-2 rounded-lg transition-colors">
+                <GitCommit size={14} /> History
+              </Link>
             </div>
           </div>
         ))}

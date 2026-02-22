@@ -1,8 +1,9 @@
 // app/server/page.tsx
 "use client";
-import { useState } from "react";
-import { Database, PlusCircle, Activity, LogOut, Coins } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Database, PlusCircle, Activity, LogOut, Coins, GitCommit } from "lucide-react";
 import AuthWrapper, { User } from "@/components/AuthWrapper";
+import Link from "next/link";
 
 export default function ServerDashboard() {
   return (
@@ -15,6 +16,17 @@ export default function ServerDashboard() {
 function ServerDashboardContent({ user, logout, refreshUser }: { user: User, logout: () => void, refreshUser: () => void }) {
   const [repoName, setRepoName] = useState("");
   const [desc, setDesc] = useState("");
+  const [myRepos, setMyRepos] = useState<any[]>([]);
+
+  const fetchRepos = async () => {
+    const res = await fetch("http://localhost:8000/repos");
+    const data = await res.json();
+    setMyRepos(data.filter((r: any) => r.owner === user.username));
+  };
+
+  useEffect(() => {
+    fetchRepos();
+  }, [user.username]);
 
   const handleCreateRepo = async (e: any) => {
     e.preventDefault();
@@ -28,6 +40,9 @@ function ServerDashboardContent({ user, logout, refreshUser }: { user: User, log
       body: formData
     });
     alert("Repository Created Successfully!");
+    fetchRepos();
+    setRepoName("");
+    setDesc("");
   };
 
   return (
@@ -60,6 +75,7 @@ function ServerDashboardContent({ user, logout, refreshUser }: { user: User, log
               <label className="text-sm text-gray-400">Model Name</label>
               <input 
                 type="text" 
+                value={repoName}
                 className="w-full bg-black border border-white/20 rounded p-2 mt-1 text-white" 
                 placeholder="e.g. MNIST-V1-Global"
                 onChange={(e) => setRepoName(e.target.value)}
@@ -68,6 +84,7 @@ function ServerDashboardContent({ user, logout, refreshUser }: { user: User, log
             <div>
               <label className="text-sm text-gray-400">Description</label>
               <textarea 
+                value={desc}
                 className="w-full bg-black border border-white/20 rounded p-2 mt-1 text-white" 
                 placeholder="Detects handwritten digits..."
                 onChange={(e) => setDesc(e.target.value)}
@@ -87,19 +104,32 @@ function ServerDashboardContent({ user, logout, refreshUser }: { user: User, log
         {/* ANALYTICS SECTION */}
         <div className="bg-white/5 p-6 rounded-xl border border-white/10">
           <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
-            <Activity size={20}/> Global Analytics
+            <Activity size={20}/> My Repositories
           </h2>
           <div className="space-y-4">
              <div className="p-4 bg-black rounded border border-white/10 flex justify-between">
                 <span>Total Active Repos</span>
-                <span className="text-rose-400 font-bold">1</span>
+                <span className="text-rose-400 font-bold">{myRepos.length}</span>
              </div>
-             <div className="p-4 bg-black rounded border border-white/10 flex justify-between">
-                <span>Total Client Commits</span>
-                <span className="text-indigo-400 font-bold">24</span>
-             </div>
-             <div className="h-32 border border-dashed border-white/20 rounded flex items-center justify-center text-gray-500 text-sm">
-               [ Commit History Graph Placeholder ]
+             
+             <div className="mt-6 space-y-3">
+               {myRepos.length === 0 ? (
+                 <div className="text-center text-gray-500 text-sm py-4">No repositories created yet.</div>
+               ) : (
+                 myRepos.map(repo => (
+                   <div key={repo.id} className="p-4 bg-black rounded border border-white/10 flex flex-col gap-3">
+                     <div className="flex justify-between items-start">
+                       <div>
+                         <h3 className="font-bold text-white">{repo.name}</h3>
+                         <p className="text-xs text-gray-500">v{repo.version} • ID: {repo.id}</p>
+                       </div>
+                       <Link href={`/repo/${repo.id}`} className="flex items-center gap-1 text-xs text-rose-400 hover:text-rose-300 bg-rose-500/10 px-3 py-1.5 rounded-lg transition-colors">
+                         <GitCommit size={14} /> History
+                       </Link>
+                     </div>
+                   </div>
+                 ))
+               )}
              </div>
           </div>
         </div>
