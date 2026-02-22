@@ -1,8 +1,9 @@
 "use client";
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { ArrowLeft, GitCommit, CheckCircle, XCircle, Clock, User as UserIcon, Coins } from "lucide-react";
+import { ArrowLeft, GitCommit, CheckCircle, XCircle, Clock, User as UserIcon, Coins, Activity } from "lucide-react";
 import AuthWrapper, { User } from "@/components/AuthWrapper";
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
 export default function RepoHistoryPage() {
   return (
@@ -19,6 +20,7 @@ function RepoHistoryContent({ user }: { user: User }) {
 
   const [repo, setRepo] = useState<any>(null);
   const [commits, setCommits] = useState<any[]>([]);
+  const [chartData, setChartData] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -33,7 +35,33 @@ function RepoHistoryContent({ user }: { user: User }) {
         // Fetch commits
         const commitsRes = await fetch(`http://localhost:8000/repos/${repoId}/commits`);
         const commitsData = await commitsRes.json();
-        setCommits(Array.isArray(commitsData) ? commitsData : []);
+        const commitsArray = Array.isArray(commitsData) ? commitsData : [];
+        setCommits(commitsArray);
+
+        // Process data for chart (reverse to chronological order)
+        const mergedCommits = commitsArray
+          .filter(c => c.status.includes("Merged"))
+          .reverse();
+        
+        const data = mergedCommits.map((c, index) => ({
+          version: `v${index + 2}`, // Assuming initial is v1
+          accuracy: c.accuracy ? parseFloat((c.accuracy * 100).toFixed(2)) : 0,
+          client: c.client
+        }));
+        
+        // Add initial v1 point if we have data
+        if (data.length > 0 && data[0].accuracy > 0) {
+          // Estimate v1 accuracy based on the first improvement
+          const firstImpMatch = mergedCommits[0].reason.match(/Imp: ([\d.]+)%/);
+          const firstImp = firstImpMatch ? parseFloat(firstImpMatch[1]) : 0;
+          data.unshift({
+            version: 'v1',
+            accuracy: parseFloat((data[0].accuracy - firstImp).toFixed(2)),
+            client: 'Initial'
+          });
+        }
+        
+        setChartData(data);
       } catch (err) {
         console.error("Failed to fetch repo data", err);
         setCommits([]);
@@ -88,6 +116,38 @@ function RepoHistoryContent({ user }: { user: User }) {
       </header>
 
       <div className="max-w-4xl mx-auto">
+        {/* ACCURACY CHART */}
+        {chartData.length > 0 && (
+          <div className="mb-12 bg-white/[0.02] border border-white/10 p-6 rounded-2xl">
+            <h2 className="text-xl font-bold mb-6 flex items-center gap-2">
+              <Activity className="text-indigo-400" /> Global Model Accuracy
+            </h2>
+            <div className="h-[300px] w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={chartData} margin={{ top: 5, right: 20, bottom: 5, left: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#ffffff10" vertical={false} />
+                  <XAxis dataKey="version" stroke="#ffffff50" tick={{ fill: '#ffffff50', fontSize: 12 }} />
+                  <YAxis stroke="#ffffff50" tick={{ fill: '#ffffff50', fontSize: 12 }} domain={['auto', 'auto']} tickFormatter={(val) => `${val}%`} />
+                  <Tooltip 
+                    contentStyle={{ backgroundColor: '#020202', borderColor: '#ffffff20', borderRadius: '8px' }}
+                    itemStyle={{ color: '#818cf8' }}
+                    formatter={(value: any) => [`${value}%`, 'Accuracy']}
+                    labelStyle={{ color: '#ffffff80', marginBottom: '4px' }}
+                  />
+                  <Line 
+                    type="monotone" 
+                    dataKey="accuracy" 
+                    stroke="#818cf8" 
+                    strokeWidth={3}
+                    dot={{ r: 4, fill: '#020202', stroke: '#818cf8', strokeWidth: 2 }}
+                    activeDot={{ r: 6, fill: '#818cf8', stroke: '#020202', strokeWidth: 2 }}
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+        )}
+
         <h2 className="text-xl font-bold mb-6 flex items-center gap-2 border-b border-white/10 pb-4">
           <GitCommit className="text-gray-400" /> Commit History
         </h2>
