@@ -1,8 +1,17 @@
 "use client";
 import { useEffect, useState } from "react";
-import { Search, UploadCloud, Coins, Loader2, CheckCircle, XCircle } from "lucide-react";
+import { Search, UploadCloud, Coins, Loader2, CheckCircle, XCircle, LogOut } from "lucide-react";
+import AuthWrapper, { User } from "@/components/AuthWrapper";
 
 export default function ClientDashboard() {
+  return (
+    <AuthWrapper>
+      {(user, logout, refreshUser) => <ClientDashboardContent user={user} logout={logout} refreshUser={refreshUser} />}
+    </AuthWrapper>
+  );
+}
+
+function ClientDashboardContent({ user, logout, refreshUser }: { user: User, logout: () => void, refreshUser: () => void }) {
   const [repos, setRepos] = useState<any[]>([]);
   const [selectedRepo, setSelectedRepo] = useState<string | null>(null);
   const [file, setFile] = useState<File | null>(null);
@@ -17,7 +26,7 @@ export default function ClientDashboard() {
     
     setIsProcessing(true);
     const formData = new FormData();
-    formData.append("client_id", "Web_Node_77"); // Fixed ID for demo
+    formData.append("client_id", user.username);
     formData.append("client_version", "1");
     formData.append("file", file);
 
@@ -30,6 +39,7 @@ export default function ClientDashboard() {
 
       if (data.status === "success") {
         alert(`✅ MERGED! Bounty: ${data.bounty} Tokens. Version is now v${data.version}`);
+        refreshUser();
       } else {
         alert(`❌ REJECTED: ${data.message}`);
       }
@@ -43,9 +53,17 @@ export default function ClientDashboard() {
   return (
     <div className="min-h-screen bg-[#020202] text-white p-10 font-mono">
       <header className="flex justify-between items-center mb-12 border-b border-white/5 pb-8">
-        <h1 className="text-2xl font-bold tracking-tighter text-indigo-400">ASYNC-SHIELD // CONTRIBUTOR_PORTAL</h1>
-        <div className="bg-yellow-500/10 border border-yellow-500/20 px-6 py-2 rounded-full text-yellow-500 font-bold flex gap-2 items-center">
-          <Coins size={18}/> Balance: <span>450 TOKENS</span>
+        <div>
+          <h1 className="text-2xl font-bold tracking-tighter text-indigo-400">ASYNC-SHIELD // CONTRIBUTOR_PORTAL</h1>
+          <p className="text-xs text-gray-500 mt-1">LOGGED IN AS: <span className="text-white">{user.username}</span></p>
+        </div>
+        <div className="flex items-center gap-4">
+          <div className="bg-yellow-500/10 border border-yellow-500/20 px-6 py-2 rounded-full text-yellow-500 font-bold flex gap-2 items-center">
+            <Coins size={18}/> Balance: <span>{user.tokens} TOKENS</span>
+          </div>
+          <button onClick={logout} className="p-2 text-gray-500 hover:text-red-400 transition-colors" title="Logout">
+            <LogOut size={20} />
+          </button>
         </div>
       </header>
 

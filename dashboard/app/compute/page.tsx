@@ -1,8 +1,17 @@
 "use client";
 import React, { useState } from 'react';
-import { Play, Upload, Download, Terminal, Loader2 } from 'lucide-react';
+import { Play, Upload, Download, Terminal, Loader2, LogOut, Coins } from 'lucide-react';
+import AuthWrapper, { User } from "@/components/AuthWrapper";
 
 export default function CloudComputePage() {
+  return (
+    <AuthWrapper>
+      {(user, logout, refreshUser) => <CloudComputeContent user={user} logout={logout} refreshUser={refreshUser} />}
+    </AuthWrapper>
+  );
+}
+
+function CloudComputeContent({ user, logout, refreshUser }: { user: User, logout: () => void, refreshUser: () => void }) {
   const [code, setCode] = useState(`import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -100,9 +109,20 @@ print("Done!")
   return (
     <div className="min-h-screen bg-background text-foreground p-8 font-sans">
       <div className="max-w-6xl mx-auto">
-        <div className="mb-8">
-          <h1 className="text-4xl font-bold tracking-tight mb-2">Cloud Compute Simulator</h1>
-          <p className="text-muted-foreground">Write your training code, upload your dataset, and get the trained weights (.pth) back.</p>
+        <div className="mb-8 flex justify-between items-start">
+          <div>
+            <h1 className="text-4xl font-bold tracking-tight mb-2">Cloud Compute Simulator</h1>
+            <p className="text-muted-foreground">Write your training code, upload your dataset, and get the trained weights (.pth) back.</p>
+            <p className="text-xs text-gray-500 mt-2 font-mono">LOGGED IN AS: <span className="text-white">{user.username}</span></p>
+          </div>
+          <div className="flex items-center gap-4 font-mono">
+            <div className="bg-yellow-500/10 border border-yellow-500/20 px-6 py-2 rounded-full text-yellow-500 font-bold flex gap-2 items-center">
+              <Coins size={18}/> Balance: <span>{user.tokens} TOKENS</span>
+            </div>
+            <button onClick={logout} className="p-2 text-gray-500 hover:text-red-400 transition-colors" title="Logout">
+              <LogOut size={20} />
+            </button>
+          </div>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">

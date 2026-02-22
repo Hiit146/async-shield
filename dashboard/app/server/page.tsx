@@ -1,9 +1,18 @@
 // app/server/page.tsx
 "use client";
 import { useState } from "react";
-import { Database, PlusCircle, Activity } from "lucide-react";
+import { Database, PlusCircle, Activity, LogOut, Coins } from "lucide-react";
+import AuthWrapper, { User } from "@/components/AuthWrapper";
 
 export default function ServerDashboard() {
+  return (
+    <AuthWrapper>
+      {(user, logout, refreshUser) => <ServerDashboardContent user={user} logout={logout} refreshUser={refreshUser} />}
+    </AuthWrapper>
+  );
+}
+
+function ServerDashboardContent({ user, logout, refreshUser }: { user: User, logout: () => void, refreshUser: () => void }) {
   const [repoName, setRepoName] = useState("");
   const [desc, setDesc] = useState("");
 
@@ -12,7 +21,7 @@ export default function ServerDashboard() {
     const formData = new FormData();
     formData.append("name", repoName);
     formData.append("description", desc);
-    formData.append("owner", "Server_Admin_1");
+    formData.append("owner", user.username);
 
     await fetch("http://localhost:8000/create_repo", {
       method: "POST",
@@ -24,9 +33,20 @@ export default function ServerDashboard() {
   return (
     <div className="min-h-screen bg-[#050505] text-white p-10 font-sans">
       <header className="flex justify-between items-center mb-10 border-b border-white/10 pb-6">
-        <h1 className="text-3xl font-bold flex items-center gap-3">
-          <Database className="text-rose-400"/> Model Owner Dashboard
-        </h1>
+        <div>
+          <h1 className="text-3xl font-bold flex items-center gap-3">
+            <Database className="text-rose-400"/> Model Owner Dashboard
+          </h1>
+          <p className="text-xs text-gray-500 mt-2 font-mono">LOGGED IN AS: <span className="text-white">{user.username}</span></p>
+        </div>
+        <div className="flex items-center gap-4 font-mono">
+          <div className="bg-yellow-500/10 border border-yellow-500/20 px-6 py-2 rounded-full text-yellow-500 font-bold flex gap-2 items-center">
+            <Coins size={18}/> Balance: <span>{user.tokens} TOKENS</span>
+          </div>
+          <button onClick={logout} className="p-2 text-gray-500 hover:text-red-400 transition-colors" title="Logout">
+            <LogOut size={20} />
+          </button>
+        </div>
       </header>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
