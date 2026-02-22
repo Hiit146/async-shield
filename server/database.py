@@ -38,9 +38,14 @@ class AsyncDatabase:
                 reason TEXT,
                 version_bump TEXT,
                 bounty INTEGER,
-                timestamp REAL
+                timestamp REAL,
+                accuracy REAL DEFAULT 0.0
             )
         ''')
+        try:
+            self.cursor.execute('ALTER TABLE commits ADD COLUMN accuracy REAL DEFAULT 0.0')
+        except sqlite3.OperationalError:
+            pass # Column already exists
         self.conn.commit()
 
     def create_repo(self, repo_id, name, description, owner):
@@ -54,12 +59,12 @@ class AsyncDatabase:
         self.cursor.execute('UPDATE repos SET version = ? WHERE id = ?', (new_version, repo_id))
         self.conn.commit()
 
-    def add_commit(self, repo_id, client_id, status, reason, version_bump, bounty):
+    def add_commit(self, repo_id, client_id, status, reason, version_bump, bounty, accuracy=0.0):
         commit_id = f"commit-{int(time.time() * 1000)}"
         self.cursor.execute('''
-            INSERT INTO commits (id, repo_id, client_id, status, reason, version_bump, bounty, timestamp)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-        ''', (commit_id, repo_id, client_id, status, reason, version_bump, bounty, time.time()))
+            INSERT INTO commits (id, repo_id, client_id, status, reason, version_bump, bounty, timestamp, accuracy)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ''', (commit_id, repo_id, client_id, status, reason, version_bump, bounty, time.time(), accuracy))
         self.conn.commit()
 
     def get_all_repos(self):
@@ -67,8 +72,8 @@ class AsyncDatabase:
         return [{"id": r[0], "name": r[1], "description": r[2], "owner": r[3], "version": r[4]} for r in self.cursor.fetchall()]
 
     def get_repo_commits(self, repo_id):
-        self.cursor.execute('SELECT client_id, status, reason, version_bump, bounty, timestamp FROM commits WHERE repo_id = ? ORDER BY timestamp DESC', (repo_id,))
-        return [{"client": r[0], "status": r[1], "reason": r[2], "version_bump": r[3], "bounty": r[4]} for r in self.cursor.fetchall()]
+        self.cursor.execute('SELECT client_id, status, reason, version_bump, bounty, timestamp, accuracy FROM commits WHERE repo_id = ? ORDER BY timestamp DESC', (repo_id,))
+        return [{"client": r[0], "status": r[1], "reason": r[2], "version_bump": r[3], "bounty": r[4], "timestamp": r[5], "accuracy": r[6]} for r in self.cursor.fetchall()]
     def create_user(self, username, password):
         try:
             self.cursor.execute('INSERT INTO users (username, password, tokens) VALUES (?, ?, 0)', (username, password))

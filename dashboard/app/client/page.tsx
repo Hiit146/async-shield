@@ -96,11 +96,11 @@ function ClientDashboardContent({ user, logout, refreshUser }: { user: User, log
       {selectedRepo && (
         <div className="max-w-xl mx-auto bg-white/[0.02] border border-white/10 p-10 rounded-3xl text-center">
           <UploadCloud size={48} className="mx-auto text-gray-500 mb-6"/>
-          <h2 className="text-xl font-bold mb-2">Submit .pth Commit</h2>
+          <h2 className="text-xl font-bold mb-2">Submit .pth or .zip Commit</h2>
           <p className="text-sm text-gray-500 mb-8">Upload binary weights for validation against the Golden Set.</p>
           
           <input 
-            type="file" accept=".pth"
+            type="file" accept=".pth,.zip"
             onChange={(e) => setFile(e.target.files?.[0] || null)}
             className="block w-full text-xs text-gray-500 mb-8 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:bg-indigo-600 file:text-white hover:file:bg-indigo-500 cursor-pointer"
           />

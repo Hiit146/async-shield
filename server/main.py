@@ -10,7 +10,7 @@ import uuid
 import os
 import torch
 import io
-import torch
+import zipfile
 import json
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException
 from aggregator import RobustAggregator
@@ -72,6 +72,11 @@ def list_repos():
     """Returns all projects for the contributor dashboard."""
     return db.get_all_repos()
 
+@app.get("/repos/{repo_id}/commits")
+def get_repo_commits(repo_id: str):
+    """Returns the commit history for a specific repository."""
+    return db.get_repo_commits(repo_id)
+
 @app.get("/repos/{repo_id}/get_model")
 def get_repo_model(repo_id: str):
     """Clients download current weights to start local training."""
@@ -106,14 +111,34 @@ async def submit_repo_update(
     # 2. Read and Parse .pth Binary File
     try:
         contents = await file.read()
-        buffer = io.BytesIO(contents)
         
+        # Check if it's a zip file containing a .pth file
+        buffer = io.BytesIO(contents)
+        if zipfile.is_zipfile(buffer):
+            with zipfile.ZipFile(buffer) as z:
+                # Find the first .pth file in the zip
+                pth_files = [f for f in z.namelist() if f.endswith('.pth')]
+                if pth_files:
+                    # Read the .pth file from the zip
+                    with z.open(pth_files[0]) as pth_file:
+                        buffer = io.BytesIO(pth_file.read())
+                else:
+                    # It might be a PyTorch .pth file itself (which is also a zip)
+                    buffer.seek(0)
+        else:
+            buffer.seek(0) # Reset buffer if not a zip
+            
         # Load the torch file (map to CPU to avoid GPU errors)
-        data = torch.load(buffer, map_location=torch.device('cpu'))
+        data = torch.load(buffer, map_location=torch.device('cpu'), weights_only=False)
         
         # Extract the delta (handles both raw tensor or dictionary format)
-        if isinstance(data, dict) and "weights_delta" in data:
-            delta = data["weights_delta"].numpy()
+        if isinstance(data, dict):
+            if "weights_delta" in data:
+                delta = data["weights_delta"].numpy() if hasattr(data["weights_delta"], 'numpy') else np.array(data["weights_delta"])
+            elif "raw_weights" in data:
+                delta = data["raw_weights"].numpy() if hasattr(data["raw_weights"], 'numpy') else np.array(data["raw_weights"])
+            else:
+                raise ValueError(f"Unknown dictionary keys in .pth file: {list(data.keys())}")
         else:
             delta = data.numpy() if hasattr(data, 'numpy') else np.array(data)
 
@@ -135,11 +160,11 @@ async def submit_repo_update(
 
     # 5. REJECTION LOGIC (Fraud & Quality)
     if real_delta_i < -0.015:
-        db.add_commit(repo_id, client_id, "Rejected ❌", f"Fraud: Acc drop {abs(real_delta_i*100):.1f}%", "None", 0)
+        db.add_commit(repo_id, client_id, "Rejected ❌", f"Fraud: Acc drop {abs(real_delta_i*100):.1f}%", "None", 0, current_accuracy)
         return {"status": "rejected", "message": "Model poisoning detected."}
 
     if real_delta_i <= 0:
-        db.add_commit(repo_id, client_id, "Rejected ❌", "No accuracy improvement", "None", 0)
+        db.add_commit(repo_id, client_id, "Rejected ❌", "No accuracy improvement", "None", 0, current_accuracy)
         return {"status": "rejected", "message": "Your update did not improve the model."}
 
     # 6. CALCULATE TRUST & MERGE
@@ -159,7 +184,7 @@ async def submit_repo_update(
     
     bounty = 5 + int(real_delta_i * 10000)
     db.add_user_tokens(client_id, bounty)
-    db.add_commit(repo_id, client_id, "Merged ✅", f"Imp: {real_delta_i*100:.2f}% | Trust: {adaptive_trust:.2f}", f"v{current_repo_v}->v{new_version}", bounty)
+    db.add_commit(repo_id, client_id, "Merged ✅", f"Imp: {real_delta_i*100:.2f}% | Trust: {adaptive_trust:.2f}", f"v{current_repo_v}->v{new_version}", bounty, current_accuracy)
 
     print(f"[SUCCESS] Repo {repo_id} upgraded to v{new_version}")
     return {"status": "success", "bounty": bounty, "version": new_version}
